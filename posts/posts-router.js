@@ -18,7 +18,23 @@ router.post("/", (req, res) => {
         Posts.insert(req.body)
         .then(post => {
             console.log(post)
-            res.status(201).json(post)
+
+            let itemToAdd = {};
+
+            //get the post object that was just created here to send back to the client
+            Posts.findById(post.id) //post here returns the id as an obj created in the db for the new post created
+            .then(response => {
+              itemToAdd = response; //set item to add
+              res.status(201).json(itemToAdd) //send itemToAdd to  client
+            })
+            .catch(error => {
+                // log error to database
+                console.log(error);
+                res.status(500).json({
+                    error: "The post information could not be retrieved. ",
+                });
+            });
+
         })
         .catch(error => {
             console.log(error);
@@ -32,12 +48,30 @@ router.post("/", (req, res) => {
 
 //POST a comment to a post
 router.post("/:id/comments", (req, res) => {
-    const userRequested = req.params;
     const createdComment = req.body;
+    let requestedPost = {};
 
-    const foundUser = users.find(user => user.id === userRequested.id); //<---- issue. how to get our "array" of posts here?
+    //see if you can find the post associated with this request
+    Posts.findById(req.params.id)
+    .then(post => {
+        console.log(post)
+        if (post.length === 0) {
+            res.status(404).json({ message: "The post with the specified ID does not exist." });
+        } else if (post) {
+            requestedPost = post;
+        }
+    })
+    .catch(error => {
+        // log error to database
+        console.log(error);
+        res.status(500).json({
+            error: "The post information could not be retrieved. ",
+        });
+    });
 
-    if (!foundUser) {
+
+    //check if post was found, then that created comment is valid, and so on in order to post the comment to the db and return it to the client properly
+    if (!requestedPost) {
         res.status(404).json({message: "The post with the specified ID does not exist. "})
     }
     else if (!createdComment.text) {
@@ -46,8 +80,22 @@ router.post("/:id/comments", (req, res) => {
     else {
         
         Posts.insertComment(req.body)
-            .then(comment => {
-                res.status(201).json(comment);
+        //console.log("when inserting comment", req.body)
+            .then(commentId => {
+
+                Posts.findCommentById(commentId.id)
+                    .then(response => {
+                        console.log(" comment created: ", response)
+                        res.status(201).json(response); //response here is the found comment object with the same ID as the comment just created
+                    })
+                    .catch(error => {
+                        // log error to database
+                        console.log(error);
+                        res.status(500).json({
+                            error: "The comment information could not be retrieved. ",
+                        });
+                    })
+                
             })
             .catch(error => {
                 // log error to database
@@ -71,11 +119,103 @@ router.post("/:id/comments", (req, res) => {
         // log error to database
         console.log(error);
         res.status(500).json({
-          error: "The posts information cold not be retrieved. ",
+          error: "The posts information could not be retrieved. ",
+        });
+      });
+  });
+
+  //GET request for get a post of a specific id
+  router.get("/:id", (req, res) => {
+    Posts.findById(req.params.id)
+        .then(post => {
+            console.log(post)
+            if (post.length === 0) {
+                res.status(404).json({ message: "The post with the specified ID does not exist." });
+            } else if (post) {
+                res.status(200).json(post);
+            }
+        })
+        .catch(error => {
+            // log error to database
+            console.log(error);
+            res.status(500).json({
+                error: "The post information could not be retrieved. ",
+            });
+        });
+  });
+
+  //GET request for a specific post's comments
+  router.get("/:id/comments", (req, res) => {
+    Posts.findPostComments(req.params.id)
+      .then(post => {
+        if (post.length === 0) {
+            res.status(404).json({ message: "The post with the specified ID does not exist." });
+    
+        } else if (post) {
+            res.status(200).json(post);
+        }
+      })
+      .catch(error => {
+        // log error to database
+        console.log(error);
+        res.status(500).json({
+          error: "The comments information could not be retrieved. "
         });
       });
   });
 
 
+  //DELETE request to delete a post by id
+  router.delete("/:id", (req, res) => {
+
+    let itemToDelete = {};
+
+    Posts.findById(req.params.id)
+        .then(post => {
+            console.log(post)
+            if (post.length === 0) {
+                res.status(404).json({ message: "The post with the specified ID does not exist." });
+            } else if (post) {
+
+                itemToDelete = post; //set post to delete
+
+                Posts.remove(req.params.id)
+                    .then(() => {
+                        res.status(200).json(itemToDelete);
+                    })
+                    .catch(error => {
+                        // log error to database
+                        console.log(error);
+                        res.status(500).json({
+                            error: "The post could not be removed."
+                        });
+                    })
+            }
+        })
+        .catch(error => {
+            // log error to database
+            console.log(error);
+            res.status(500).json({
+                error: "The post information could not be retrieved. ",
+            });
+        });
+
+
+    // Posts.remove(req.params.id)
+    //   .then(count => {
+    //     if (count > 0) {
+    //       res.status(200).json(itemToDelete);
+    //     } else {
+    //       res.status(404).json({ message: "The post with the specified ID does not exist." });
+    //     }
+    //   })
+    //   .catch(error => {
+    //     // log error to database
+    //     console.log(error);
+    //     res.status(500).json({
+    //       error: "The post could not be removed."
+    //     });
+    //   });
+  });
 
 module.exports = router;
