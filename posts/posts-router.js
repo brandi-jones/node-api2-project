@@ -218,4 +218,48 @@ router.post("/:id/comments", (req, res) => {
     //   });
   });
 
+
+
+  //PUT request to edit a post
+  router.put("/:id", (req, res) => {
+    const changes = req.body;
+
+    if (!changes.title || !changes.contents) {
+        res.status(400).json({
+            errorMessage: "Please provide title and contents for the post. "
+        })
+    }
+    else {
+        Posts.update(req.params.id, changes)
+        .then(response => {
+          if (response) {
+              let newPost = {};
+              Posts.findById(req.params.id) 
+                  .then(post => {
+                      newPost = post; //set item to add
+                      res.status(200).json(newPost) //send itemToAdd to  client
+                  })
+                  .catch(error => {
+                      // log error to database
+                      console.log(error);
+                      res.status(500).json({
+                          error: "The post information could not be retrieved. ",
+                      });
+                  });
+           
+          } else {
+            res.status(404).json({ message: "The post with the specified ID does not exist."});
+          }
+        })
+        .catch(error => {
+          // log error to database
+          console.log(error);
+          res.status(500).json({
+            error: "The post information could not be modified."
+          });
+        });
+    }
+   
+  });
+
 module.exports = router;
